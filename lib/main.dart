@@ -1,127 +1,387 @@
+import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations(
+          [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight])
+      .then((_) {
+    runApp(const MaterialApp(home: MyHome()));
+  });
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a blue toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-//method with old library
-class _MyHomePageState extends State<MyHomePage> {
-
-   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  Barcode? result;
-  QRViewController? controller;
-
-  // In order to get hot reload to work we need to pause the camera if the platform
-  // is android, or resume the camera if the platform is iOS.
-
-    @override
-  void reassemble() {
-    super.reassemble();
-    if (Platform.isAndroid) {
-      controller!.pauseCamera();
-    } else if (Platform.isIOS) {
-      controller!.resumeCamera();
-    }
-  }
+class MyHome extends StatelessWidget {
+  const MyHome({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: <Widget>[
-          Expanded(
-            flex: 5,
-            child: QRView(
-              key: qrKey,
-              onQRViewCreated: _onQRViewCreated,
-              cameraFacing: CameraFacing.back,
-              overlay: QrScannerOverlayShape(borderColor: Colors.black, cutOutSize: 300 ),
+      appBar: AppBar(title: const Text('Flutter Demo Home Page')),
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () {
+            showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              builder: (BuildContext context) {
+                return const QRViewExample();
+              },
+            );
+          },
+          child: const Text('Scan qr code'),
+        ),
+      ),
+    );
+  }
+}
 
+class QRViewExample extends StatefulWidget {
+  const QRViewExample({Key? key}) : super(key: key);
+
+  @override
+  State<StatefulWidget> createState() => _QRViewExampleState();
+}
+
+class _QRViewExampleState extends State<QRViewExample> {
+  Barcode? result;
+  QRViewController? controller;
+  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  String name = "";
+  String lastName = "";
+  String age = "";
+  String division = "";
+  String gender = "";
+  String urlImage = "";
+  Widget imageAvatar = const CircleAvatar(
+    // or any widget that use imageProvider like (PhotoView)
+    backgroundImage: AssetImage('assets/avatar.png'),
+    radius: 50,
+  );
+
+  bool error = false;
+
+  // In order to get hot reload to work we need to pause the camera if the platform
+  // is android, or resume the camera if the platform is iOS.
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    if (Platform.isAndroid) {
+      controller!.pauseCamera();
+    }
+    controller!.resumeCamera();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(child: columnsModal(context)),
+        Row(
+          children: [
+            const Spacer(),
+            SizedBox(
+              child: TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Container(
+                  color: Colors.red,
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 15, horizontal: 22),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(color: Colors.white, fontSize: 13.0),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget columnsModal(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration:
+                  BoxDecoration(border: Border.all(color: Colors.black)),
+              child: cameraScanner(context),
             ),
           ),
+          const SizedBox(
+            width: 10,
+          ),
           Expanded(
-            flex: 1,
-            child: Center(
-              child: (result != null)
-                  ? Text(
-                      'Barcode Type: ${describeEnum(result!.format)}   Data: ${result!.code}')
-                  : Text('Scan a code'),
+            child: Container(
+              decoration:
+                  BoxDecoration(border: Border.all(color: Colors.black)),
+              child: detailPlayer(),
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
+  Widget detailPlayer() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(15),
+      child: Column(
+        children: [
+          const Text('Player Detail',
+              style: TextStyle(color: Colors.black, fontSize: 49)),
+          const SizedBox(
+            height: 15,
+          ),
+          imageAvatar,
+          const SizedBox(
+            height: 28,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 15),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Row(
+                children: [
+                  const Text(
+                    'First Name:',
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(
+                    width: 10,
+                  ),
+                  Text(
+                    name,
+                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                  )
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(
+            height: 15,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 15),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Row(
+                children: [
+                  const Text(
+                    'Last Name:',
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(
+                    width: 10,
+                  ),
+                  Text(
+                    lastName,
+                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                  )
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(
+            height: 15,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 15),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Row(
+                children: [
+                  const Text(
+                    'Gender:',
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(
+                    width: 10,
+                  ),
+                  Text(
+                    gender,
+                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                  )
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(
+            height: 15,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 15),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Row(
+                children: [
+                  const Text(
+                    'Age:',
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(
+                    width: 10,
+                  ),
+                  Text(
+                    age,
+                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                  )
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(
+            height: 15,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 15),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Row(
+                children: [
+                  const Text(
+                    'Division:',
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(
+                    width: 10,
+                  ),
+                  Text(
+                    division,
+                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                  )
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget cameraScanner(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        Expanded(child: _buildQrView(context)),
+      ],
+    );
+  }
+
+  Widget _buildQrView(BuildContext context) {
+    // For this example we check how width or tall the device is and change the scanArea and overlay accordingly.
+    var scanArea = (MediaQuery.of(context).size.width < 400 ||
+            MediaQuery.of(context).size.height < 400)
+        ? 300.0
+        : 600.0;
+    // To ensure the Scanner view is properly sizes after rotation
+    // we need to listen for Flutter SizeChanged notification and update controller
+    return QRView(
+      key: qrKey,
+      onQRViewCreated: _onQRViewCreated,
+      overlay: QrScannerOverlayShape(
+          borderColor: const Color.fromARGB(255, 255, 17, 0),
+          borderRadius: 10,
+          borderLength: 30,
+          borderWidth: 10,
+          cutOutSize: scanArea),
+      onPermissionSet: (ctrl, p) => _onPermissionSet(context, ctrl, p),
+    );
+  }
+
   void _onQRViewCreated(QRViewController controller) {
-    this.controller = controller;
-    controller.scannedDataStream.listen((scanData) {
-      if(scanData.code != null){
-   setState(() {
-        result = scanData;
-      });
-
-      }
-
+    setState(() {
+      this.controller = controller;
     });
+    controller.scannedDataStream.listen(
+      (scanData) {
+        _setPlayerData(scanData);
+      },
+      onError: (error) {
+        print('error');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('The qr code is not valid')),
+        );
+      },
+      onDone: () {},
+    );
+  }
 
-       print("set result");
-       var resultado = result?.code ?? 'nada encontrado';
-      print(resultado);
+  void _onPermissionSet(BuildContext context, QRViewController ctrl, bool p) {
+    log('${DateTime.now().toIso8601String()}_onPermissionSet $p');
+    if (!p) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('no Permission')),
+      );
+    }
+  }
+
+  void _setPlayerData(Barcode? data) {
+    try {
+      var stringJson = data?.code ?? "";
+      var resultDecode = jsonDecode(stringJson);
+      setState(() {
+        print('value setted');
+        name = resultDecode['first_name'];
+        lastName = resultDecode['last_name'];
+        age = resultDecode['age'].toString();
+        division = resultDecode['division_season'];
+        gender = resultDecode['sex'];
+        urlImage = resultDecode['photo_url'];
+        try {
+          imageAvatar = CircleAvatar(
+          backgroundImage: NetworkImage(urlImage),
+          radius: 50,
+        );
+        } catch (e) {
+           imageAvatar = const CircleAvatar(
+          // or any widget that use imageProvider like (PhotoView)
+          backgroundImage: AssetImage('assets/avatar.png'),
+          radius: 50,
+        );
+        }
+
+      });
+    } catch (e) {
+      setState(() {
+        print('value setted empty');
+        name = '';
+        lastName = '';
+        age = '';
+        division = '';
+        gender = '';
+        urlImage = '';
+        imageAvatar = const CircleAvatar(
+          // or any widget that use imageProvider like (PhotoView)
+          backgroundImage: AssetImage('assets/avatar.png'),
+          radius: 50,
+        );
+      });
+    }
   }
 
   @override
@@ -130,4 +390,3 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 }
-
