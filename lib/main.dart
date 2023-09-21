@@ -345,7 +345,6 @@ class _QRViewExampleState extends State<QRViewExample> {
       var stringJson = data?.code ?? "";
       var resultDecode = jsonDecode(stringJson);
       setState(() {
-        print('value setted');
         name = resultDecode['first_name'];
         lastName = resultDecode['last_name'];
         age = resultDecode['age'].toString();
@@ -368,7 +367,6 @@ class _QRViewExampleState extends State<QRViewExample> {
       });
     } catch (e) {
       setState(() {
-        print('value setted empty');
         name = '';
         lastName = '';
         age = '';
